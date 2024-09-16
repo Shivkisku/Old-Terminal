@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Old Terminal</title>
+    <style>
+        body {
+            background-color: #2e2e2e;
+            color: #00ff00;
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+        }
+        #terminal {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        #output {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+        }
+        .prompt {
+            color: #00ff00;
+        }
+        input {
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: inherit; /* Use the inherited text color */
+            font-family: monospace;
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="output"></div>
+        <div class="input-line">
+            <span class="prompt">$</span>
+            <input type="text" id="command-input" autofocus>
+        </div>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+        const inputField = document.getElementById('command-input');
+
+        let currentPath = '/home/user'; // Starting directory
+        let fileSystem = {
+            '/home/user': ['Documents', 'Downloads', 'Pictures'],
+            '/home/user/Documents': ['file1.txt', 'file2.doc', 'project'],
+            '/home/user/Downloads': ['app.zip', 'video.mp4'],
+            '/home/user/Pictures': ['image1.png', 'image2.jpg'],
+            '/home/user/sim1': ['in.txt', 'out.txt'],
+            '/home/user/sim5': ['Results']
+        };
+        let fileContents = {
+            '/home/user/Documents/file1.txt': 'This is the content of file1.txt.',
+            '/home/user/Documents/file2.doc': 'This is the content of file2.doc.',
+            '/home/user/Documents/project': 'Project directory.'
+        };
+        let fileDatabase = [
+            '/home/user/Documents/file1.txt',
+            '/home/user/Documents/file2.doc',
+            '/home/user/Downloads/app.zip',
+            '/home/user/Downloads/video.mp4',
+            '/home/user/Pictures/image1.png',
+            '/home/user/Pictures/image2.jpg'
+        ];
+        let processes = [
+            'PID 1: init', 
+            'PID 2: kswapd0', 
+            'PID 3: khubd', 
+            'PID 4: ksoftirqd/0'
+        ]; // Simulated list of processes
+
+        let textColor = '#00ff00'; // Default text color
+
+        // Define available commands
+        const commands = {
+            help: () => {
+                return `
+                    <strong>Available Commands:</strong><br>
+                    <strong>cd</strong>: Change directory. Usage: cd [directory]<br>
+                    <strong>ls</strong>: List directory contents. Usage: ls<br>
+                    <strong>mkdir</strong>: Make directory. Usage: mkdir [directory]<br>
+                    <strong>cp</strong>: Copy files or directories. Usage: cp [src] [dst]<br>
+                    <strong>mv</strong>: Move or rename files and directories. Usage: mv [src] [dst]<br>
+                    <strong>rm</strong>: Remove files or directories. Usage: rm [file or directory]<br>
+                    <strong>pwd</strong>: Print working directory. Usage: pwd<br>
+                    <strong>echo</strong>: Output a string to the terminal. Usage: echo [text]<br>
+                    <strong>cat</strong>: Display the contents of a file. Usage: cat [file]<br>
+                    <strong>locate</strong>: Find a file in the system. Usage: locate [filename]<br>
+                    <strong>ps</strong>: List currently running processes. Usage: ps<br>
+                    <strong>color</strong>: Change text color. Usage: color [hex color code]<br>
+                    <strong>clear</strong>: Clear the terminal screen.<br>
+                    <strong>help</strong>: Display available commands.<br>
+                `;
+            },
+            clear: () => {
+                outputDiv.innerHTML = ''; // Clear the terminal
+            },
+            echo: (args) => args, // Simply echo the input text
+            cd: (args) => changeDirectory(args), // Change directory
+            ls: () => listDirectory(), // List directory contents
+            mkdir: (args) => makeDirectory(args), // Make directory
+            cp: (args) => copyFileOrDirectory(args), // Copy file or directory
+            mv: (args) => moveOrRename(args), // Move or rename file or directory
+            rm: (args) => removeFileOrDirectory(args), // Remove file or directory
+            pwd: () => currentPath, // Print working directory
+            cat: (args) => displayFileContents(args), // Display file contents
+            locate: (args) => locateFile(args), // Locate a file
+            ps: () => listProcesses(), // List running processes
+            color: (args) => changeColor(args) // Change text color
+        };
+
+        // Process and execute the entered command
+        function processCommand(input) {
+            if (input.trim() === '') return;
+
+            const inputArr = input.split(' ');
+            const cmd = inputArr[0];
+            const args = inputArr.slice(1).join(' ');
+
+            // Display the command in the output
+            const outputLine = document.createElement('div');
+            outputLine.innerHTML = `<span class="prompt">${currentPath} $</span> ${input}`;
+            outputDiv.appendChild(outputLine);
+
+            // Check if the command exists
+            if (commands[cmd]) {
+                const result = commands[cmd](args);
+                if (result) {
+                    const resultLine = document.createElement('div');
+                    resultLine.innerHTML = result;
+                    outputDiv.appendChild(resultLine);
+                }
+            } else {
+                // If the command is not recognized, show an error
+                const errorLine = document.createElement('div');
+                errorLine.textContent = `'${cmd}' is not recognized as a command. Type 'help' for a list of commands.`;
+                outputDiv.appendChild(errorLine);
+            }
+
+            // Scroll to the bottom after output
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+
+            // Clear the input field after executing the command
+            inputField.value = '';
+        }
+
+        // Listen for Enter key press on the input field
+        inputField.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                const input = inputField.value;
+                processCommand(input);
+            }
+        });
+
+        // Simulate changing directories
+        function changeDirectory(path) {
+            if (!path || path.trim() === '') {
+                return 'Please specify a directory.';
+            }
+
+            if (path === '..') {
+                // Move to the parent directory
+                currentPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+            } else if (path === '~') {
+                // Go to the home directory
+                currentPath = '/home/user';
+            } else {
+                const newPath = currentPath === '/' ? `/${path}` : `${currentPath}/${path}`;
+                if (fileSystem[newPath]) {
+                    currentPath = newPath;
+                } else {
+                    return 'No such directory.';
+                }
+            }
+
+            return null; // No output needed for `cd`
+        }
+
+        // Simulate listing directory contents
+        function listDirectory() {
+            const contents = fileSystem[currentPath];
+            if (contents) {
+                return contents.join('<br>');
+            } else {
+                return 'No such directory.';
+            }
+        }
+
+        // Simulate making directories
+        function makeDirectory(name) {
+            if (!name || name.trim() === '') {
+                return 'Please specify a directory name.';
+            }
+
+            const newPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+            if (!fileSystem[newPath]) {
+                fileSystem[newPath] = []; // Create an empty directory
+                fileSystem[currentPath] = fileSystem[currentPath] || [];
+                fileSystem[currentPath].push(name); // Add the directory to the current path
+                return null; // No output needed for mkdir
+            } else {
+                return 'Directory already exists.';
+            }
+        }
+
+        // Simulate copying files or directories
+        function copyFileOrDirectory(args) {
+            const [src, dst] = args.split(' ');
+            if (!src || !dst) {
+                return 'Usage: cp [src] [dst]';
+            }
+
+            const srcPath = currentPath === '/' ? `/${src}` : `${currentPath}/${src}`;
+            const dstPath = currentPath === '/' ? `/${dst}` : `${currentPath}/${dst}`;
+            
+            if (fileSystem[srcPath]) {
+                // Copy directory
+                fileSystem[dstPath] = [...fileSystem[srcPath]]; // Shallow copy contents
+                if (fileSystem[currentPath]) {
+                    fileSystem[currentPath].push(dst);
+                }
+            } else if (Object.keys(fileSystem).some(path => path.endsWith(src))) {
+                // Copy file
+                const srcFileName = src.substring(src.lastIndexOf('/') + 1);
+                const dstFileName = dst.includes('/') ? dst.substring(dst.lastIndexOf('/') + 1) : dst;
+                fileContents[dstPath] = fileContents[srcPath];
+                if (fileSystem[currentPath]) {
+                    fileSystem[currentPath].push(dstFileName);
+                }
+            } else {
+                return 'No such file or directory.';
+            }
+
+            return null; // No output needed for cp
+        }
+
+        // Simulate moving or renaming files or directories
+        function moveOrRename(args) {
+            const [src, dst] = args.split(' ');
+            if (!src || !dst) {
+                return 'Usage: mv [src] [dst]';
+            }
+
+            const srcPath = currentPath === '/' ? `/${src}` : `${currentPath}/${src}`;
+            const dstPath = currentPath === '/' ? `/${dst}` : `${currentPath}/${dst}`;
+            
+            if (fileSystem[srcPath]) {
+                // Move directory
+                fileSystem[dstPath] = [...fileSystem[srcPath]]; // Shallow copy contents
+                delete fileSystem[srcPath];
+                if (fileSystem[currentPath]) {
+                    fileSystem[currentPath] = fileSystem[currentPath].filter(item => item !== src);
+                    fileSystem[currentPath].push(dst);
+                }
+            } else if (Object.keys(fileSystem).some(path => path.endsWith(src))) {
+                // Move file
+                const srcFileName = src.substring(src.lastIndexOf('/') + 1);
+                const dstFileName = dst.includes('/') ? dst.substring(dst.lastIndexOf('/') + 1) : dst;
+                if (fileSystem[currentPath]) {
+                    fileSystem[currentPath] = fileSystem[currentPath].filter(file => file !== srcFileName);
+                    fileSystem[currentPath].push(dstFileName);
+                }
+            } else {
+                return 'No such file or directory.';
+            }
+
+            return null; // No output needed for mv
+        }
+
+        // Simulate removing files or directories
+        function removeFileOrDirectory(name) {
+            const pathToRemove = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+            
+            if (fileSystem[pathToRemove]) {
+                // Remove directory
+                delete fileSystem[pathToRemove];
+                fileSystem[currentPath] = fileSystem[currentPath].filter(item => item !== name);
+            } else if (Object.keys(fileSystem).some(path => path.endsWith(name))) {
+                // Remove file
+                fileSystem[currentPath] = fileSystem[currentPath].filter(file => file !== name);
+            } else {
+                return 'No such file or directory.';
+            }
+
+            return null; // No output needed for rm
+        }
+
+        // Simulate displaying file contents
+        function displayFileContents(fileName) {
+            const filePath = currentPath === '/' ? `/${fileName}` : `${currentPath}/${fileName}`;
+            return fileContents[filePath] || 'No such file.';
+        }
+
+        // Simulate locating a file
+        function locateFile(filename) {
+            const foundFiles = fileDatabase.filter(path => path.includes(filename));
+            if (foundFiles.length > 0) {
+                return foundFiles.join('<br>');
+            } else {
+                return 'No such file found.';
+            }
+        }
+
+        // Simulate listing currently running processes
+        function listProcesses() {
+            return processes.join('<br>');
+        }
+
+        // Simulate changing text color
+        function changeColor(hexColor) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+                textColor = hexColor;
+                document.body.style.color = textColor;
+                return `Text color changed to ${hexColor}.`;
+            } else {
+                return 'Invalid color code. Use a hex code like #FF0000.';
+            }
+        }
+    </script>
+</body>
+</html>
